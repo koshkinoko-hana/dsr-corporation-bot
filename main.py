@@ -1,39 +1,52 @@
 import telegram
+import logging
 from telegram import Update
 from telegram.ext import CallbackContext, CommandHandler, Updater, MessageHandler, Filters
 from user import check_or_create_user, form_message, start_game, clear_total, get_rating, user_answer, game_not_started, \
     ready_for_congratulations, fill_users
 
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+)
+
 token = '5131416625:AAHhnJKY3bLMx54JA_dwMrwP1vKs-J-nsQ8'
 
 bot = telegram.Bot(token)
-
 default_message = 'Чтобы начать игру, введи /game. Чтобы получить поздравление, отправь /congratulation. ' \
                   'Все команды - /commands.'
+
+logger = logging.getLogger(__name__)
 
 
 def start(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
+    logger.info("Start:\nuser:\n%s\n", user)
+
     exists = check_or_create_user(user)
     message = '' if exists else 'Привет! Я DSR бот. Предлагаю сыграть в игру! ' \
                                 'Если ты наберёшь 10 очков, то получишь персональное поздравление. ' \
                                 'Получить правила игры - /rules .'
-    update.message.reply_html(
-        message + default_message
-    )
+    message += default_message
+    logger.info("Start:\nuser:\n%s,\nresponse:\n%s\n", user, message)
+    update.message.reply_html(message)
 
 
 def get_congratulation(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
+    logger.info("Get congratulation:\nuser:\n%s\n", user)
     check_or_create_user(user)
 
+    message = form_message(user.id, False)
+    logger.info("Get congratulation:\nuser:\n%s,\nresponse: \n%s\n", user, message)
     update.message.reply_html(
-        form_message(user.id)
+        message
     )
 
 
 def default(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
+    logger.info("Default:\nuser:\n%s\n", user)
+
     exists = check_or_create_user(user)
     message = default_message if exists else 'Привет! Я DSR бот. Предлагаю сыграть в игру! ' \
                                 'Если ты наберёшь 10 очков, то получишь персональное поздравление. ' \
@@ -42,6 +55,8 @@ def default(update: Update, context: CallbackContext) -> None:
     if not game_not_started(user.id):
         message = 'Для отправки хода введи латинскую букву и число, ' \
                   'соответсвующие строке и колонке на поле. Или начни новую игру /game. Все команды - /commands'
+
+    logger.info("Default:\nuser:\n%s,\nresponse:\n%s\n", user, message)
     update.message.reply_html(
         message
     )
@@ -49,23 +64,31 @@ def default(update: Update, context: CallbackContext) -> None:
 
 def game(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
+    logger.info("Game:\nuser:\n%s\n", user)
+
+    message = start_game(user)
+    logger.info("Game:\nuser:\n%s,\nresponse:\n%s\n", user, message)
     update.message.reply_html(
-        start_game(user)
+        message
     )
 
 
 def process_answer(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
-    print(user)
+    logger.info("Process answer:\nuser:\n%s\n", user)
+
+    message = user_answer(user, update.message.text)
+    logger.info("Process answer:\nuser:\n%s,\nresponse:\n%s\n", user, message)
     update.message.reply_html(
-        user_answer(user, update.message.text)
+        message
     )
     if ready_for_congratulations(user.id):
+        logger.info("Process answer - personal congrats:\nuser:\n%s\n", user)
         update.message.reply_html(
-            'Вы заработали 10 очков! Получите ваше персональное поздравление!'
+            'Ты заработал 10 очков! Получи своё персональное поздравление!'
         )
         update.message.reply_html(
-            form_message(user.id)
+            form_message(user.id, True)
         )
 
 
@@ -77,6 +100,7 @@ def rating(update: Update, context: CallbackContext) -> None:
 
 def clear_process(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
+    logger.info("Clear process: user: %s", user)
     clear_total(user.id)
     update.message.reply_html(
         'Достижения обнулены! У вас 0 очков.'

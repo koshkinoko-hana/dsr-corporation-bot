@@ -18,7 +18,6 @@ def fill_users():
 
 
 def check_or_create_user(user):
-    print(user)
     if str(user.id) in users_list:
         return True
     else:
@@ -40,7 +39,6 @@ def check_or_create_user(user):
 
 def game_not_started(user_id):
     user = users_list[str(user_id)]
-    print(user)
     if 'game' not in user or user['game']['touched_count'] == 15:
         return 'Чтобы начать новую игру, введи /game .'
 
@@ -55,14 +53,15 @@ def start_game(u):
     return res
 
 
-def form_message(user_id):
+def form_message(user_id, by_points):
     user = users_list.get(str(user_id))
     count = user['greetings_count']
-    if count < 3:
-        user['greetings_count'] += 1
-        with open('users_list.json', 'w') as f:
-            json.dump(users_list, f)
-            f.close()
+    if count < 3 or by_points:
+        if not by_points:
+            user['greetings_count'] += 1
+            with open('users_list.json', 'w') as f:
+                json.dump(users_list, f)
+                f.close()
         greeting_index = random.randint(0, len(greetings)-1)
         message = '{0} {1}!\n'.format(user['first_name'], user['last_name'])
         message += greetings[greeting_index]['message'] + '\n'
