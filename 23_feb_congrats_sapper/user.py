@@ -5,12 +5,12 @@ from sapper import init_sapper, answer
 
 users_list = {}
 
-greetings_file = open('greetings_list.json')
+greetings_file = open('./greetings_list.json')
 greetings = json.load(greetings_file)
 
 
 def fill_users():
-    users_file = open('users_list.json')
+    users_file = open('./users_list.json')
     global users_list
     users_list = json.load(users_file)
     print(users_list)
