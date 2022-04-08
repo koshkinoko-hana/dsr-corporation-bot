@@ -58,3 +58,10 @@ GET_BEST_USERS_BY_RESULTS = 'SELECT SUM(uai.points) total, u.first_name fn, u.la
                             'inner join user_activities ua on u.id = ua.user_id ' \
                             'where(ua.blocked is null or ua.blocked = 0) ' \
                             'group by u.id order by total desc limit 10'
+
+GET_USER_RESULTS = 'SELECT uai.item_id item_id, uai.response response, uai.points  points ' \
+                            'from users u inner join user_activity_items uai on u.id = uai.user_id ' \
+                            'inner join user_activities ua on u.id = ua.user_id ' \
+                            'where(ua.blocked is null or ua.blocked = 0) and ua.activity_id = 1 ' \
+                            'and u.telegram_id = %s ' \
+                            'order by uai.item_id'

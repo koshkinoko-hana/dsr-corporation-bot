@@ -6,7 +6,7 @@ import telegram
 import logging
 from telegram import Update
 from telegram.ext import CallbackContext, CommandHandler, Updater, MessageHandler, Filters, JobQueue
-from students_quiz.user import check_or_create_user, make_question, user_answer, get_rating, results
+from students_quiz.user import check_or_create_user, make_question, user_answer, get_rating, results, get_my_result
 from students_quiz.init import ACTIVITY, current_question, init_quiz
 from students_quiz.stickers import stickers
 
@@ -19,7 +19,6 @@ token = '5131416625:AAHhnJKY3bLMx54JA_dwMrwP1vKs-J-nsQ8'
 bot = telegram.Bot(token)
 
 jobQueue = JobQueue()
-
 
 rules_message = 'Правила квиза «Угадай язык программирования» \n\n' \
                 '1. После получения вопроса твоё первое сообщение будет засчитано за ответ. ' \
@@ -45,6 +44,7 @@ logger = logging.getLogger(__name__)
 def send_sticker(user_id) -> None:
     sticker = random.choice(stickers)
     bot.send_sticker(user_id, sticker=sticker)
+
 
 def start(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
@@ -77,8 +77,21 @@ def rating(update: Update, context: CallbackContext) -> None:
     )
 
 
+def my_result(update: Update, context: CallbackContext) -> None:
+    send_sticker(update.effective_user.id)
+
+    if not current_question.get('winner_exists'):
+        update.message.reply_html(
+            'Функция станет доступна по окончанию квиза.'
+        )
+    else:
+        update.message.reply_html(
+            get_my_result(update.effective_user.id)
+        )
+
+
 def rules(update: Update, context: CallbackContext) -> None:
-    update.message.reply_html(rules)
+    update.message.reply_html(rules_message)
 
 
 def commands(update: Update, context: CallbackContext) -> None:
@@ -95,10 +108,18 @@ def process_message(update: Update, context: CallbackContext) -> None:
     answer = update.message.text
     logger.info("Process answer:\nuser:\n%s\nanswer:\n%s", user, update.message)
 
-    message = user_answer(user, answer)
+    (message, winner) = user_answer(user, answer)
     logger.info("Process answer response:\nuser:\n%s,\nresponse:\n%s\n", user, message)
     send_sticker(user.id)
     update.message.reply_html(message)
+
+    if winner:
+        (a, ids) = make_question()
+
+        for id in ids:
+            bot.send_message(id, 'Победитель определён! Спасибо за участие. Для получения рейтинга отправь /rating. '
+                                 'Для получения своего результата отправь /myresult')
+            send_sticker(id)
 
 
 def run_question(*args) -> None:
@@ -110,18 +131,23 @@ def run_question(*args) -> None:
         (winner, mess) = results()
         if mess:
             bot.send_message(winner, mess)
+            current_question.update({'winner_exists': True})
+            for id in ids:
+                bot.send_message(id, 'Победитель определён! Спасибо за участие. Для получения рейтинга отправь /rating. '
+                                     'Для получения своего результата отправь /myresult')
             return
         else:
             message = 'Внимание! У нас несколько претендентов на победу. Финальный вопрос решит схватку: '
             ids = winner
+            current_question.update({'pretenders': ids})
             logger.info("FINAL BATTLE:\nquestion:\n%s,\nto users:\n%s\n", question, ids)
 
-
-    next_time = question.get('time_start') + datetime.timedelta(minutes=0, seconds=58)
+    next_time = question.get('time_start') + datetime.timedelta(minutes=4, seconds=58)
 
     for id in ids:
         bot.send_message(id, message)
-        bot.send_photo(id, photo=open('./students_quiz/questions/'+question.get('description'), 'rb'))
+        bot.send_photo(id, photo=open('./students_quiz/questions/' + question.get('description'), 'rb'))
+
     jobQueue.run_once(callback=run_question, when=next_time)
 
 
@@ -138,6 +164,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("rules", rules))
     dispatcher.add_handler(CommandHandler("rating", rating))
+    dispatcher.add_handler(CommandHandler("myresult", my_result))
     dispatcher.add_handler(CommandHandler("commands", commands))
     dispatcher.add_handler(MessageHandler(Filters.all, process_message))
 
